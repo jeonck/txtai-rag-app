@@ -16,6 +16,8 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Run demo RAG question
-        run: python txtai_rag_app.py --demo --ask "What was won?" | tee output.txt
+        run: |
+          set -o pipefail
+          python txtai_rag_app.py --demo --ask "What was won?" | tee output.txt
       - name: Check answer mentions the lottery win
         run: grep -qi "lottery" output.txt
