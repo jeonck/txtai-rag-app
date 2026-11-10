@@ -247,7 +247,14 @@ class TxtaiRAGApp:
         Returns (answer, retrieved_chunks_with_scores, citation_uid).
         """
         retrieved = self.search(question, limit=self.context)
-        _name, answer, reference = self._get_rag()(question)
+        # The RAG pipeline's return shape varies by txtai version:
+        # output="reference" may return (name, answer, reference) or just
+        # (answer, reference). Unpack defensively instead of assuming 3.
+        result = self._get_rag()(question)
+        if len(result) == 3:
+            _name, answer, reference = result
+        else:
+            answer, reference = result[0], result[-1]
         citation = reference if reference in self._by_uid else (
             retrieved[0][0].uid if retrieved else None
         )
