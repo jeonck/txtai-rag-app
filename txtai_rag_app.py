@@ -200,8 +200,19 @@ class TxtaiRAGApp:
         if self._embeddings is None:
             raise RuntimeError("Index not built — call build_index() first.")
         results = self._embeddings.search(query, limit=limit)
-        return [(self._by_uid[uid], float(score)) for uid, score in results
-                if uid in self._by_uid]
+        # txtai's search rows are not always 2-tuples: depending on the
+        # version and index options they can be (uid, score, text) triples
+        # or dicts. Unpack defensively instead of assuming (uid, score).
+        found: list[tuple[Chunk, float]] = []
+        for row in results:
+            if isinstance(row, dict):
+                uid = row.get("id", row.get("uid"))
+                score = row.get("score", 0.0)
+            else:
+                uid, score = row[0], row[1]
+            if uid in self._by_uid:
+                found.append((self._by_uid[uid], float(score)))
+        return found
 
     def print_search(self, query: str, limit: int = 5):
         print(f"\nSearch: {query!r}")
