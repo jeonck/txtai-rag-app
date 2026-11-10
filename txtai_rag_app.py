@@ -223,9 +223,10 @@ class TxtaiRAGApp:
     def _get_rag(self):
         """Create the RAG pipeline once, on first use (loads the LLM).
 
-        output='reference' makes the pipeline return
-        (name, answer, reference), where `reference` is the uid of the
+        output='reference' asks the pipeline to include the uid of the
         context chunk the answer most likely came from — the citation.
+        Current txtai returns that as a dict {"answer": ..., "reference": ...};
+        ask() normalizes older tuple shapes too.
         """
         if self._rag is None:
             from txtai import RAG
@@ -248,13 +249,24 @@ class TxtaiRAGApp:
         """
         retrieved = self.search(question, limit=self.context)
         # The RAG pipeline's return shape varies by txtai version:
-        # output="reference" may return (name, answer, reference) or just
-        # (answer, reference). Unpack defensively instead of assuming 3.
+        # current versions return a dict {"answer": ..., "reference": ...};
+        # older ones return (name, answer, reference) or (answer, reference)
+        # tuples. Normalize all shapes instead of assuming one.
         result = self._get_rag()(question)
-        if len(result) == 3:
-            _name, answer, reference = result
+        if isinstance(result, list) and result and isinstance(result[0], dict):
+            result = result[0]
+        if isinstance(result, dict):
+            answer = result.get("answer") or result.get("text") or ""
+            reference = result.get("reference")
+        elif isinstance(result, (list, tuple)):
+            if len(result) == 3:
+                _name, answer, reference = result
+            elif len(result) == 2:
+                answer, reference = result
+            else:
+                answer, reference = str(result), None
         else:
-            answer, reference = result[0], result[-1]
+            answer, reference = str(result), None
         citation = reference if reference in self._by_uid else (
             retrieved[0][0].uid if retrieved else None
         )
